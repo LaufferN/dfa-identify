@@ -15,6 +15,8 @@ from collections import deque
 
 from more_itertools import interleave_longest
 
+from vis import save_dfa_as_pdf
+
 def order_models_by_stutter(
         solver_fact,
         codecs: list[Codec],
@@ -307,26 +309,27 @@ if __name__=="__main__":
                 rejecting.append(trace)
     # accepting = ['y', 'yy', 'oy', 'boy']
     # rejecting = ['r', 'b', 'o', 'or', 'br', 'yr', 'rr', 'by']
-    num_dfas = 2
-    dfa_sizes = [3, 3]
-        
+    num_dfas = 1
+    dfa_sizes = [9]
+
     # my_dfas_gen = find_dfa_decompositions(accepting, rejecting, num_dfas, dfa_sizes, order_by_stutter=True)
-    my_dfas_gen = enumerate_pareto_frontier(accepting, rejecting, num_dfas, order_by_stutter=True)
-    for my_dfas in my_dfas_gen:
-        print(my_dfas)
-        count = 0
-        for my_dfa in my_dfas:
-            draw.write_dot(my_dfa, "temp" + str(count) + ".dot")
-            assert all(my_dfa.label(x) for x in accepting)
-            count += 1
-        for x in rejecting:
-            assert any(not my_dfa.label(x) for my_dfa in my_dfas)
+    # my_dfas_gen = enumerate_pareto_frontier(accepting, rejecting, num_dfas, order_by_stutter=True)
+    # for my_dfas in my_dfas_gen:
+    #     print(my_dfas)
+    #     count = 0
+    #     for my_dfa in my_dfas:
+    #         draw.write_dot(my_dfa, "temp" + str(count) + ".dot")
+    #         assert all(my_dfa.label(x) for x in accepting)
+    #         count += 1
+    #     for x in rejecting:
+    #         assert any(not my_dfa.label(x) for my_dfa in my_dfas)
 
-    # my_dfa_gen = find_dfas(accepting, rejecting)
+    my_dfa_gen = find_dfas(accepting, rejecting, order_by_stutter=True)
 
-    # for my_dfa in my_dfa_gen:
-    #     print(my_dfa)
-    #     draw.write_dot(my_dfa, "temp.dot")
-    #     assert all(my_dfa.label(x) for x in accepting)
-    #     assert all(not my_dfa.label(x) for x in rejecting)
-    #     input()
+    for my_dfa in my_dfa_gen:
+        print(my_dfa)
+        draw.write_dot(my_dfa, "temp.dot")
+        assert all(my_dfa.label(x) for x in accepting)
+        assert all(not my_dfa.label(x) for x in rejecting)
+        save_dfa_as_pdf(my_dfa, "monolithic_dfa.pdf")
+        input()

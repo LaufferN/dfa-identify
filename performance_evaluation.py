@@ -6,6 +6,7 @@ import time
 import signal
 import math
 import random
+import sys
 
 TIMEOUT_SECONDS = 10 * 60 # Timeout after 10 minutes
 
@@ -65,12 +66,9 @@ def generate_examples(n_tasks: int,
     return positive_examples, negative_examples
 
 def get_next_solution_and_check(generator, accepting, rejecting, is_monolithic):
-    try:
-        start_time = time.time()
-        result = next(generator)
-        end_time = time.time()
-    except:
-        return None
+    start_time = time.time()
+    result = next(generator)
+    end_time = time.time()
     if is_monolithic:
         assert all(result.label(x) for x in accepting)
         assert all(not result.label(x) for x in rejecting)
@@ -89,33 +87,41 @@ def exp_vary_dfas(seed, n_syms, n_dfas_lower, n_dfas_upper, bound):
     baseline = {}
     this_work = {}
 
-    signal.signal(signal.SIGALRM, alarm_handler)
     signal.alarm(0)
+    assert signal.alarm(0) == 0
 
     for n_dfas in range(n_dfas_lower, n_dfas_upper + 1):
+        accepting, rejecting = generate_examples(n_dfas, n_syms, bound)
+        baseline_generator = find_dfas(accepting, rejecting, order_by_stutter=True)
+        start = time.time()
+        signal.alarm(TIMEOUT_SECONDS)
         try:
-            accepting, rejecting = generate_examples(n_dfas, n_syms, bound)
-            baseline_generator = find_dfas(accepting, rejecting, order_by_stutter=True)
-            signal.alarm(TIMEOUT_SECONDS)
-            try:
-                result = get_next_solution_and_check(baseline_generator, accepting, rejecting, True)
-            except TimeOutException:
-                result = None
-            signal.alarm(0)
-            baseline[(bound, n_syms, n_dfas)] = result
-            print('Baseline', (bound, n_syms, n_dfas), baseline[(bound, n_syms, n_dfas)])
-            this_work_generator = enumerate_pareto_frontier(accepting, rejecting, n_dfas, order_by_stutter=True)
-            signal.alarm(TIMEOUT_SECONDS)
-            try:
-                result = get_next_solution_and_check(this_work_generator, accepting, rejecting, False)
-            except TimeOutException:
-                result = None
-            signal.alarm(0)
-            this_work[(bound, n_syms, n_dfas)] = result
-            print('This Work', (bound, n_syms, n_dfas), this_work[(bound, n_syms, n_dfas)])
+            result = get_next_solution_and_check(baseline_generator, accepting, rejecting, True)
         except TimeOutException:
-            pass
+            end = time.time()
+            print('Timeout after', end - start, 'seconds')
+            result = None
         signal.alarm(0)
+        assert signal.alarm(0) == 0
+        baseline[(bound, n_syms, n_dfas)] = result
+        print('Baseline', (bound, n_syms, n_dfas), baseline[(bound, n_syms, n_dfas)])
+        if result is None:
+            break
+        this_work_generator = enumerate_pareto_frontier(accepting, rejecting, n_dfas, order_by_stutter=True)
+        start = time.time()
+        signal.alarm(TIMEOUT_SECONDS)
+        try:
+            result = get_next_solution_and_check(this_work_generator, accepting, rejecting, False)
+        except TimeOutException:
+            end = time.time()
+            print('Timeout after', end - start, 'seconds')
+            result = None
+        signal.alarm(0)
+        assert signal.alarm(0) == 0
+        this_work[(bound, n_syms, n_dfas)] = result
+        print('This Work', (bound, n_syms, n_dfas), this_work[(bound, n_syms, n_dfas)])
+        if result is None:
+            break
 
     f = open('seed' + str(seed) + '_exp_vary_dfas_baseline_' + str(n_syms) + '_' + str(n_dfas_lower) + '_' + str(n_dfas_upper) + '_' + str(bound) + '_results.csv', 'w+')
     f.write('bound,n_syms,n_dfas,time\n')
@@ -133,33 +139,41 @@ def exp_vary_examples(seed, n_syms, n_dfas, bound_lower, bound_upper, step=10):
     baseline = {}
     this_work = {}
 
-    signal.signal(signal.SIGALRM, alarm_handler)
     signal.alarm(0)
+    assert signal.alarm(0) == 0
 
     for bound in range(bound_lower, bound_upper + 1, step):
+        accepting, rejecting = generate_examples(n_dfas, n_syms, bound)
+        baseline_generator = find_dfas(accepting, rejecting, order_by_stutter=True)
+        start = time.time()
+        signal.alarm(TIMEOUT_SECONDS)
         try:
-            accepting, rejecting = generate_examples(n_dfas, n_syms, bound)
-            baseline_generator = find_dfas(accepting, rejecting, order_by_stutter=True)
-            signal.alarm(TIMEOUT_SECONDS)
-            try:
-                result = get_next_solution_and_check(baseline_generator, accepting, rejecting, True)
-            except TimeOutException:
-                result = None
-            signal.alarm(0)
-            baseline[(bound, n_syms, n_dfas)] = result
-            print('Baseline', (bound, n_syms, n_dfas), baseline[(bound, n_syms, n_dfas)])
-            this_work_generator = enumerate_pareto_frontier(accepting, rejecting, n_dfas, order_by_stutter=True)
-            signal.alarm(TIMEOUT_SECONDS)
-            try:
-                result = get_next_solution_and_check(this_work_generator, accepting, rejecting, False)
-            except TimeOutException:
-                result = None
-            signal.alarm(0)
-            this_work[(bound, n_syms, n_dfas)] = result
-            print('This Work', (bound, n_syms, n_dfas), this_work[(bound, n_syms, n_dfas)])
+            result = get_next_solution_and_check(baseline_generator, accepting, rejecting, True)
         except TimeOutException:
-            pass
+            end = time.time()
+            print('Timeout after', end - start, 'seconds')
+            result = None
         signal.alarm(0)
+        assert signal.alarm(0) == 0
+        baseline[(bound, n_syms, n_dfas)] = result
+        print('Baseline', (bound, n_syms, n_dfas), baseline[(bound, n_syms, n_dfas)])
+        if result is None:
+            break
+        this_work_generator = enumerate_pareto_frontier(accepting, rejecting, n_dfas, order_by_stutter=True)
+        start = time.time()
+        signal.alarm(TIMEOUT_SECONDS)
+        try:
+            result = get_next_solution_and_check(this_work_generator, accepting, rejecting, False)
+        except TimeOutException:
+            end = time.time()
+            print('Timeout after', end - start, 'seconds')
+            result = None
+        signal.alarm(0)
+        assert signal.alarm(0) == 0
+        this_work[(bound, n_syms, n_dfas)] = result
+        print('This Work', (bound, n_syms, n_dfas), this_work[(bound, n_syms, n_dfas)])
+        if result is None:
+            break
 
     f = open('seed' + str(seed) + '_exp_vary_examples_baseline_' + str(n_syms) + '_' + str(n_dfas) + '_' + str(bound_lower) + '_' + str(bound_upper) + '_' + str(step) + '_results.csv', 'w+')
     f.write('bound,n_syms,n_dfas,time\n')
@@ -177,8 +191,8 @@ def exp_vary_solutions(seed, n_syms, n_dfas, bound, solutions=100):
     baseline = {}
     this_work = {}
 
-    signal.signal(signal.SIGALRM, alarm_handler)
     signal.alarm(0)
+    assert signal.alarm(0) == 0
 
     accepting, rejecting = generate_examples(n_dfas, n_syms, bound)
     baseline_generator = find_dfas(accepting, rejecting, order_by_stutter=True)
@@ -186,26 +200,30 @@ def exp_vary_solutions(seed, n_syms, n_dfas, bound, solutions=100):
     baseline_result = 0
     this_work_result = 0
     for solution in range(1, solutions + 1):
+        start = time.time()
+        signal.alarm(TIMEOUT_SECONDS)
         try:
-            signal.alarm(TIMEOUT_SECONDS)
-            try:
-                baseline_result += get_next_solution_and_check(baseline_generator, accepting, rejecting, True)
-            except TimeOutException:
-                break
-            signal.alarm(0)
-            baseline[(bound, n_syms, n_dfas)] = baseline_result
-            print('Baseline', (bound, n_syms, n_dfas, solution), baseline[(bound, n_syms, n_dfas)])
-            signal.alarm(TIMEOUT_SECONDS)
-            try:
-                this_work_result += get_next_solution_and_check(this_work_generator, accepting, rejecting, False)
-            except TimeOutException:
-                break
-            signal.alarm(0)
-            this_work[(bound, n_syms, n_dfas)] = this_work_result
-            print('This Work', (bound, n_syms, n_dfas, solution), this_work[(bound, n_syms, n_dfas)])
+            baseline_result += get_next_solution_and_check(baseline_generator, accepting, rejecting, True)
         except TimeOutException:
+            end = time.time()
+            print('Timeout after', end - start, 'seconds')
             pass
         signal.alarm(0)
+        assert signal.alarm(0) == 0
+        baseline[(bound, n_syms, n_dfas)] = baseline_result
+        print('Baseline', (bound, n_syms, n_dfas, solution), baseline[(bound, n_syms, n_dfas)])
+        start = time.time()
+        signal.alarm(TIMEOUT_SECONDS)
+        try:
+            this_work_result += get_next_solution_and_check(this_work_generator, accepting, rejecting, False)
+        except TimeOutException:
+            end = time.time()
+            print('Timeout after', end - start, 'seconds')
+            pass
+        signal.alarm(0)
+        assert signal.alarm(0) == 0
+        this_work[(bound, n_syms, n_dfas)] = this_work_result
+        print('This Work', (bound, n_syms, n_dfas, solution), this_work[(bound, n_syms, n_dfas)])
 
     f = open('seed' + str(seed) + '_exp_vary_solutions_baseline_' + str(n_syms) + '_' + str(n_dfas) + '_' + str(bound) + '_' + str(solutions) + '_results.csv', 'w+')
     f.write('bound,n_syms,n_dfas,time\n')
@@ -221,37 +239,54 @@ def exp_vary_solutions(seed, n_syms, n_dfas, bound, solutions=100):
 
 if __name__ == '__main__':
 
-    for seed in range(10):
+    default_recursion_limit = sys.getrecursionlimit()
+    sys.setrecursionlimit(default_recursion_limit**2)
+
+    signal.signal(signal.SIGALRM, alarm_handler)
+    signal.alarm(0)
+    assert signal.alarm(0) == 0
+
+    for seed in range(0, 5):
 
         random.seed(seed)
 
         print('Running for seed', seed)
 
-        exp_vary_dfas(seed, 2, 2, 10, 10)
-        exp_vary_dfas(seed, 4, 2, 10, 10)
-        exp_vary_dfas(seed, 8, 2, 10, 10)
+        exp_vary_dfas(seed, 2, 2, 20, 10)
+        # exp_vary_dfas(seed, 3, 2, 20, 10)
+        # exp_vary_dfas(seed, 4, 2, 20, 10)
+        # exp_vary_dfas(seed, 5, 2, 20, 10)
+        # exp_vary_dfas(seed, 6, 2, 20, 10)
+        # exp_vary_dfas(seed, 7, 2, 20, 10)
+        # exp_vary_dfas(seed, 8, 2, 20, 10)
 
-        exp_vary_dfas(seed, 2, 2, 10, 100)
-        exp_vary_dfas(seed, 4, 2, 10, 100)
-        exp_vary_dfas(seed, 8, 2, 10, 100)
+        # # exp_vary_dfas(seed, 2, 2, 20, 100)
+        # # exp_vary_dfas(seed, 3, 2, 20, 100)
+        # # exp_vary_dfas(seed, 4, 2, 20, 100)
+        # # exp_vary_dfas(seed, 5, 2, 20, 100)
+        # # exp_vary_dfas(seed, 6, 2, 20, 100)
+        # # exp_vary_dfas(seed, 7, 2, 20, 100)
+        # # exp_vary_dfas(seed, 8, 2, 20, 100)
 
-        exp_vary_examples(seed, 2, 2, 10, 100)
-        exp_vary_examples(seed, 2, 4, 10, 100)
-        exp_vary_examples(seed, 2, 8, 10, 100)
+        # exp_vary_examples(seed, 2, 2, 10, 1000)
+        # exp_vary_examples(seed, 2, 4, 10, 1000)
+        # exp_vary_examples(seed, 2, 8, 10, 1000)
 
-        exp_vary_examples(seed, 4, 2, 10, 100)
-        exp_vary_examples(seed, 4, 4, 10, 100)
-        exp_vary_examples(seed, 4, 8, 10, 100)
+        # exp_vary_examples(seed, 4, 2, 10, 1000)
+        # exp_vary_examples(seed, 4, 4, 10, 1000)
+        # exp_vary_examples(seed, 4, 8, 10, 1000)
 
-        exp_vary_examples(seed, 8, 2, 10, 100)
-        exp_vary_examples(seed, 8, 4, 10, 100)
-        exp_vary_examples(seed, 8, 8, 10, 100)
+        # exp_vary_examples(seed, 8, 2, 10, 1000)
+        # exp_vary_examples(seed, 8, 4, 10, 1000)
+        # exp_vary_examples(seed, 8, 8, 10, 1000)
 
-        exp_vary_solutions(seed, 4, 2, 10, 100)
-        exp_vary_solutions(seed, 4, 4, 10, 100)
-        exp_vary_solutions(seed, 4, 8, 10, 100)
+        # # exp_vary_solutions(seed, 4, 2, 10, 100)
+        # # exp_vary_solutions(seed, 4, 4, 10, 100)
+        # # exp_vary_solutions(seed, 4, 8, 10, 100)
 
-        exp_vary_solutions(seed, 8, 2, 10, 100)
-        exp_vary_solutions(seed, 8, 4, 10, 100)
-        exp_vary_solutions(seed, 8, 8, 10, 100)
+        # # exp_vary_solutions(seed, 8, 2, 10, 100)
+        # # exp_vary_solutions(seed, 8, 4, 10, 100)
+        # # exp_vary_solutions(seed, 8, 8, 10, 100)
+
+    sys.setrecursionlimit(default_recursion_limit)
 
