@@ -2,7 +2,10 @@ from functools import cache
 from itertools import combinations_with_replacement
 
 import funcy as fn
-from dfa_identify import find_dfas
+from functools import reduce
+import operator as op
+from dfa_identify.identify import find_dfas
+from dfa_identify.decomposed import find_decomposed_dfas
 
 
 def all_words(alphabet):
@@ -31,6 +34,50 @@ def distinguishing_query(positive, negative, alphabet):
     # not constrained by positive / negative.
     constrained = set(positive) | set(negative)
     return fn.first(w for w in all_words(alphabet) if w not in constrained)
+
+
+def find_dfa_decomposition(monolithic_dfa, alphabet, n_dfas, n_queries=10, n_init_examples=10):
+    """
+    Returns an iterator of cDFAs consistent with a monolithic DFA.
+    """
+    positive = []
+    negative = []
+    for word, _ in zip(all_words(alphabet), range(n_init_examples)):
+        label = monolithic_dfa.label(word)
+        if label is True:    positive.append(word)
+        elif label is False: negative.append(word)
+
+    cdfa_gen = find_decomposed_dfas(positive, negative, n_dfas, alphabet=alphabet)
+
+    # 1. Ask membership queries that distiguish remaining candidates.
+    for _ in range(n_queries):
+        candidate_cdfa = next(cdfa_gen)
+        candidate_mono = reduce(op.and_, candidate_cdfa)
+
+        assert all(candidate_mono.label(w) for w in positive)
+        assert not any(candidate_mono.label(w) for w in negative)
+
+        sym_diff = (candidate_mono ^ monolithic_dfa)
+        dist_word = sym_diff.find_word(True)
+        if dist_word is None:
+            # we found equiv cdfa
+            # yield candidate_cdfa
+            pass
+        else:
+            label = monolithic_dfa.label(tuple(dist_word))
+            if label is True:    positive.append(dist_word)
+            elif label is False: negative.append(dist_word)
+            # recreate generator with example set
+            cdfa_gen = find_decomposed_dfas(positive, negative, n_dfas, alphabet=alphabet)
+
+    def check_equiv(cdfa):
+        return reduce(op.and_, cdfa) == monolithic_dfa
+
+    kwargs = {}
+    # kwargs.setdefault('order_by_stutter', True)
+    # kwargs.setdefault('allow_unminimized', True)
+    yield from filter(check_equiv, find_decomposed_dfas(positive, negative, n_dfas, alphabet=alphabet, **kwargs))
+
 
 
 def find_dfas_active(alphabet, oracle, n_queries,
@@ -93,5 +140,6 @@ def find_dfa_active(alphabet, oracle, n_queries,
 
 __all__ = ['find_dfas_active',
            'find_dfa_active',
+           'find_dfa_decomposition',
            'all_words',
            'distinguishing_query']

@@ -5,6 +5,7 @@ import funcy as fn
 from pysat.solvers import Glucose4
 
 from dfa_identify import decomposed
+from dfa_identify.active import find_dfa_decomposition
 from dfa_identify.identify import find_models
 from dfa_identify.graphs import APTA
 
@@ -86,3 +87,28 @@ def test_disjunction():
     assert all(all(~d.label(w) for d in dfas) for w in rejecting)
     # At least one dfa must accept an accepting string.
     assert all(any(d.label(w) for d in dfas) for w in accepting)
+
+
+def test_decompose_from_monolithic():
+    alphabet = {'r', 'g', 'b', 'y'}
+    accepting = ['y', 'yy', 'gy', 'bgy', 'bbgy', 'bggy']
+    rejecting = ['', 'r', 'ry', 'by', 'yr', 'gr', 'rr', 'rry', 'rygy']
+    dfas = next(decomposed.find_decomposed_dfas(accepting=accepting,
+                                                rejecting=rejecting,
+                                                n_dfas=2,
+                                                order_by_stutter=True))
+
+    monolithic_dfa = reduce(op.and_, dfas)
+
+    decomp_size = 2
+    n_queries=20
+    n_init_examples=10
+    decomps = find_dfa_decomposition(monolithic_dfa, alphabet, decomp_size, n_queries, n_init_examples)
+    num_dfas = 10
+    for cdfa, _ in zip(decomps, range(num_dfas)):
+        dfa = reduce(op.and_, cdfa)
+        assert dfa == monolithic_dfa
+
+
+if __name__ == '__main__':
+    test_decompose_from_monolithic()
